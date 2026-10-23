@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Prospect Mailer</title>
+  <meta name="description" content="Your Prospect Mailer CRM on the go — contacts, pipeline, follow-ups and daily reports.">
+  <meta name="theme-color" content="#0b6e57">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Prospect">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="app.css?v=1.6.0-202610230745">
+</head>
+<body>
+  <header class="top">
+    <button class="icon-btn" id="back" aria-label="Back" hidden>
+      <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M15.4 4.6 8 12l7.4 7.4-1.4 1.4L5.2 12l8.8-8.8z"/></svg>
+    </button>
+    <h1 id="title">Prospect Mailer</h1>
+    <span class="sync-dot" id="sync-dot" title="Sync status"></span>
+    <button class="icon-btn" id="settings-btn" aria-label="Settings">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M19.4 13a7.5 7.5 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1L15 3.5h-4l-.4 2.5a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4L6.6 11a7.5 7.5 0 0 0 0 2l-2 1.6 2 3.4 2.4-1c.5.4 1.1.7 1.7 1l.4 2.5h4l.4-2.5c.6-.3 1.2-.6 1.7-1l2.4 1 2-3.4zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg>
+    </button>
+  </header>
+
+  <div class="banner" id="banner" hidden></div>
+  <main id="view" tabindex="-1"></main>
+
+  <button class="fab" id="fab" aria-label="Add a contact from LinkedIn">
+    <svg viewBox="0 0 24 24" width="26" height="26"><path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>
+  </button>
+
+  <nav class="tabs" id="tabs">
+    <a href="#/home" data-tab="home"><svg viewBox="0 0 24 24"><path d="M4 11.5 12 5l8 6.5V20h-5v-5h-6v5H4z"/></svg><span>Home</span></a>
+    <a href="#/contacts" data-tab="contacts"><svg viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0 2c-4 0-7 2-7 4.5V20h14v-1.5C19 16 16 14 12 14z"/></svg><span>Contacts</span></a>
+    <a href="#/pipeline" data-tab="pipeline"><svg viewBox="0 0 24 24"><path d="M4 5h4v14H4zm6 0h4v10h-4zm6 0h4v6h-4z"/></svg><span>Pipeline</span></a>
+    <a href="#/followups" data-tab="followups"><svg viewBox="0 0 24 24"><path d="M12 4a8 8 0 1 0 8 8h-2a6 6 0 1 1-1.8-4.3L13 11h7V4l-2.4 2.4A8 8 0 0 0 12 4z"/></svg><span>Follow-ups</span><b class="badge" id="fu-badge" hidden></b></a>
+    <a href="#/day" data-tab="day"><svg viewBox="0 0 24 24"><path d="M5 19h3v-6H5zm5.5 0h3V9h-3zM16 19h3V5h-3z"/></svg><span>My Day</span></a>
+  </nav>
+
+  <div class="sheet-bg" id="sheet-bg" hidden></div>
+  <section class="sheet" id="sheet" role="dialog" aria-modal="true" hidden></section>
+  <div class="toast" id="toast" role="status"></div>
+
+  <script type="module" src="app.js?v=1.6.0-202610230745"></script>
+</body>
+</html>
