@@ -8,7 +8,7 @@ import { combine, summarize, dayKey, kindOfCat } from './lib/tracker.js';
 import { periodRange, aggregate, shiftPeriod } from './lib/periods.js';
 import { fmtMin } from './lib/report.js';
 
-const VERSION = '1.6.0-202610230745';
+const VERSION = '1.7.0-202610261826';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -370,7 +370,7 @@ function compose(id, draft = null) {
     const applyTpl = () => {
       const tpl = tpls.find((x) => x.id === $('#m-tpl', sh).value);
       if (tpl) {
-        $('#m-body', sh).value = fillTemplate(tpl.body, vals(), nameFor(fromSel()));
+        $('#m-body', sh).value = fillTemplate(tpl.body, vals(), nameFor(fromSel()), senderProfile({ gmailAccounts: [], ...s }, fromSel()).signature);
         $('#m-sub', sh).value = fillTemplate(tpl.subject, vals(), nameFor(fromSel()));
       }
       applyReply();

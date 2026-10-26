@@ -1,7 +1,7 @@
 // Your data on the phone: the same file the extension syncs in your Google Drive app folder.
 // Every change is timestamped and merged with the extension's merge rules, so phone and laptops never overwrite each other.
 import { merge } from './lib/sync.js';
-import { uid, normalizeLinkedinUrl, senderProfile } from './lib/store.js';
+import { uid, normalizeLinkedinUrl, senderProfile, withSignature } from './lib/store.js';
 import * as crm from './lib/crm.js';
 import { computeDue, fillTemplate } from './lib/followups.js';
 import { buildMime } from './lib/gmail.js';
@@ -214,7 +214,7 @@ const b64url = (str) => {
 export async function sendEmail({ from, to, subject, text, threadId, inReplyTo }) {
   const s = settings();
   const prof = senderProfile({ gmailAccounts: [], ...s }, from);
-  const fullText = prof.signature ? `${text}\n\n${prof.signature}` : text;
+  const fullText = withSignature(text, prof.signature);
   const token = auth.getToken(from, 'gmail');
   const raw = b64url(buildMime({ to, subject, text: fullText, fromName: prof.name, fromEmail: from, inReplyTo }));
   let res;
@@ -267,7 +267,7 @@ export async function sendFollowUpNow(leadId, fuId) {
   if (!tpl) throw new Error(`Template “${fu.templateName || 'follow-up'}” no longer exists.`);
   const prof = senderProfile({ gmailAccounts: [], ...settings() }, fu.from);
   const subject = fu.threadId ? (/^re:/i.test(fu.origSubject) ? fu.origSubject : 'Re: ' + fu.origSubject) : fillTemplate(tpl.subject, l, prof.name);
-  const sent = await sendEmail({ from: fu.from, to: l.email || fu.to, subject, text: fillTemplate(tpl.body, l, prof.name), threadId: fu.threadId || undefined, inReplyTo: fu.inReplyTo || undefined });
+  const sent = await sendEmail({ from: fu.from, to: l.email || fu.to, subject, text: fillTemplate(tpl.body, l, prof.name, prof.signature), threadId: fu.threadId || undefined, inReplyTo: fu.inReplyTo || undefined });
   commit((s) => {
     const x = s.leads.find((y) => y.id === leadId);
     const t = now();
