@@ -4,7 +4,7 @@ import { merge } from './lib/sync.js';
 import { uid, normalizeLinkedinUrl, senderProfile, withSignature } from './lib/store.js';
 import * as crm from './lib/crm.js';
 import { computeDue, fillTemplate } from './lib/followups.js';
-import { buildMime } from './lib/gmail.js';
+import { buildMime, textToHtml } from './lib/gmail.js';
 import { normalizePerson } from './lib/salesql.js';
 import * as auth from './auth.js';
 import { idbGet, idbSet, idbClear } from './idb.js';
@@ -193,8 +193,45 @@ const patchFu = (leadId, fuId, patch) => commit((s) => {
   l.followUps = (l.followUps || []).map((f) => (f.id === fuId ? { ...f, ...patch, updatedAt: now() } : f));
   return touch(l, {});
 });
-export const fuCancel = (leadId, fuId) => patchFu(leadId, fuId, { status: 'cancelled' });
-export const fuReschedule = (leadId, fuId, due) => patchFu(leadId, fuId, { due, status: 'scheduled', error: '' });
+export const fuCancel = (leadId, fuId) => {
+  const fu = lead(leadId)?.followUps?.find((f) => f.id === fuId);
+  const r = patchFu(leadId, fuId, { status: 'cancelled' });
+  if (fu) { const snd = cloudFor(fu.from); if (snd) cloudCall(snd, { type: 'fu-cancel', ids: [fuId] }).catch(() => {}); }
+  return r;
+};
+export const fuReschedule = (leadId, fuId, due) => { const r = patchFu(leadId, fuId, { due, status: 'scheduled', error: '' }); cloudQueue(leadId); return r; };
+
+// ---------- cloud follow-ups: tell the cloud script right away (the laptop may be off) ----------
+const low = (e) => (e || '').toLowerCase();
+function cloudFor(email) {
+  const s = settings();
+  if (s.cloudUrl && s.cloudSecret && low(s.cloudAccount) === low(email)) return { url: s.cloudUrl, secret: s.cloudSecret };
+  const x = (s.cloudSenders || {})[low(email)];
+  return x && x.url && x.secret ? x : null;
+}
+async function cloudCall(snd, body) {
+  const r = await fetch(snd.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ ...body, secret: snd.secret }) }).then((x) => x.json());
+  if (!r.ok) throw new Error(r.error || 'Cloud script error');
+  return r;
+}
+export function cloudQueue(leadId) {
+  setTimeout(async () => {
+    const l = lead(leadId);
+    if (!l || l.type === 'Do Not Contact') return;
+    const s = settings();
+    for (const fu of (l.followUps || []).filter((f) => f.status === 'scheduled' && f.mode === 'auto')) {
+      const snd = cloudFor(fu.from);
+      const tpl = templates().find((t) => t.id === fu.templateId);
+      if (!snd || !tpl) continue;
+      const prof = senderProfile({ gmailAccounts: [], ...s }, fu.from);
+      const text = withSignature(fillTemplate(tpl.body, l, prof.name, prof.signature), prof.signature);
+      const subject = fu.threadId ? (/^re:/i.test(fu.origSubject) ? fu.origSubject : 'Re: ' + fu.origSubject) : fillTemplate(tpl.subject, l, prof.name);
+      const threads = [...new Set((l.emailsSent || []).filter((e) => e.threadId && low(e.from) === low(fu.from)).map((e) => e.threadId))];
+      const job = { id: fu.id, leadId: l.id, due: fu.due, from: fu.from, fromName: prof.name, to: l.email || fu.to, subject, text, html: textToHtml(text), threadId: fu.threadId || '', inReplyTo: fu.inReplyTo || '', threads };
+      cloudCall(snd, { type: 'fu-add', jobs: [job] }).catch(() => { /* older script: the laptop will pass it on */ });
+    }
+  }, 0);
+}
 
 export function allFollowUps() {
   return leads().flatMap((l) => (l.followUps || []).map((f) => ({ ...f, lead: l }))).sort((a, b) => a.due - b.due);
@@ -255,6 +292,7 @@ export const recordSent = (leadId, { subject, templateName, sent, followUp, done
       status: 'scheduled', deviceId: 'any', attempts: 0, createdAt: t, updatedAt: t,
     }];
   }
+  if (followUp && followUp.mode === 'auto') cloudQueue(leadId);
   return touch(l, { followUps: fus, status: !l.status || l.status === 'New' ? 'Contacted' : l.status });
 });
 
@@ -267,6 +305,12 @@ export async function sendFollowUpNow(leadId, fuId) {
   if (!tpl) throw new Error(`Template “${fu.templateName || 'follow-up'}” no longer exists.`);
   const prof = senderProfile({ gmailAccounts: [], ...settings() }, fu.from);
   const subject = fu.threadId ? (/^re:/i.test(fu.origSubject) ? fu.origSubject : 'Re: ' + fu.origSubject) : fillTemplate(tpl.subject, l, prof.name);
+  // make sure the cloud hasn't already sent it (and stop it from sending it now)
+  const snd = cloudFor(fu.from);
+  if (snd) {
+    const c = await cloudCall(snd, { type: 'fu-claim', id: fu.id }).catch(() => ({ claimed: true }));
+    if (c.result && c.result.status === 'sent') throw new Error('The cloud already sent this follow-up.');
+  }
   const sent = await sendEmail({ from: fu.from, to: l.email || fu.to, subject, text: fillTemplate(tpl.body, l, prof.name, prof.signature), threadId: fu.threadId || undefined, inReplyTo: fu.inReplyTo || undefined });
   commit((s) => {
     const x = s.leads.find((y) => y.id === leadId);
