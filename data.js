@@ -6,6 +6,7 @@ import * as crm from './lib/crm.js';
 import { computeDue, fillTemplate } from './lib/followups.js';
 import { buildMime, textToHtml } from './lib/gmail.js';
 import { normalizePerson } from './lib/salesql.js';
+import * as aiwrite from './lib/aiwrite.js';
 import * as auth from './auth.js';
 import { idbGet, idbSet, idbClear } from './idb.js';
 
@@ -248,12 +249,13 @@ const b64url = (str) => {
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 };
 
-export async function sendEmail({ from, to, subject, text, threadId, inReplyTo }) {
+export async function sendEmail({ from, to, subject, text, html, threadId, inReplyTo }) {
   const s = settings();
   const prof = senderProfile({ gmailAccounts: [], ...s }, from);
   const fullText = withSignature(text, prof.signature);
+  const fullHtml = html && globalThis.PMRich ? globalThis.PMRich.emailHtml(html, text, prof.signature) : undefined;
   const token = auth.getToken(from, 'gmail');
-  const raw = b64url(buildMime({ to, subject, text: fullText, fromName: prof.name, fromEmail: from, inReplyTo }));
+  const raw = b64url(buildMime({ to, subject, text: fullText, html: fullHtml, fromName: prof.name, fromEmail: from, inReplyTo }));
   let res;
   try {
     res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
@@ -320,6 +322,12 @@ export async function sendFollowUpNow(leadId, fuId) {
     return touch(x, {});
   });
   return subject;
+}
+
+// ---------- Write with AI (same writer as the extension) ----------
+export async function aiWrite({ leadId, goal, from, base }) {
+  const l = lead(leadId);
+  return aiwrite.write({ person: l, insights: l.insights || {}, goal, base, history: l.emailsSent || [], from, settings: { gmailAccounts: [], ...settings() } });
 }
 
 // ---------- SalesQL ----------

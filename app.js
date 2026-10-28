@@ -2,13 +2,13 @@
 import * as D from './data.js';
 import * as auth from './auth.js';
 import * as crm from './lib/crm.js';
-import { LEAD_STATUSES, normalizeLinkedinUrl, senderProfile } from './lib/store.js';
+import { LEAD_STATUSES, normalizeLinkedinUrl, senderProfile, withSignature } from './lib/store.js';
 import { fillTemplate } from './lib/followups.js';
 import { combine, summarize, dayKey, kindOfCat } from './lib/tracker.js';
 import { periodRange, aggregate, shiftPeriod } from './lib/periods.js';
 import { fmtMin } from './lib/report.js';
 
-const VERSION = '1.7.0-202610261826';
+const VERSION = '1.9.0-202610281903';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -21,7 +21,7 @@ const initials = (l) => ((l.firstName || l.email || '?')[0] + (l.lastName || '')
 const typeClass = (t) => 't-' + t.toLowerCase().replace(/[^a-z]+/g, '-');
 const localInput = (t) => { const d = new Date(t); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
 const lastTouch = (l) => Math.max(l.createdAt || 0, ...(l.emailsSent || []).map((e) => e.date || 0), ...(l.activities || []).map((a) => a.at || 0), l.repliedAt || 0);
-const COLORS = { P: '#0b6e57', N: '#8fb9ad', D: '#e07a3f', O: '#7d8fd6', I: '#f0c75e', L: '#c7ccd1', '.': 'var(--line)' };
+const COLORS = { P: '#3461ff', N: '#a9bcff', D: '#ff6b1a', O: '#b48be6', I: '#f4c95d', L: '#cdd2de', '.': 'var(--line)' };
 const KIND = { productive: 'P', neutral: 'N', distracting: 'D' };
 
 function toast(msg) {
@@ -189,7 +189,7 @@ function home(v) {
       </div>
     </div>`;
 }
-const scoreColor = (s) => (s >= 70 ? '#0b6e57' : s >= 45 ? '#b7791f' : '#c2410c');
+const scoreColor = (s) => (s >= 70 ? '#1f9d63' : s >= 45 ? '#b7791f' : '#c2410c');
 
 // =====================================================================
 // CONTACTS
@@ -346,19 +346,29 @@ function compose(id, draft = null) {
     to: draft?.to || l.email || '',
     templateId: draft?.templateId ?? (dueReminder ? fu.templateId : ''),
     reply: draft?.reply ?? (dueReminder && !!last),
-    subject: draft?.subject || '', body: draft?.body || '',
+    subject: draft?.subject || '', body: draft?.body || '', bodyHtml: draft?.bodyHtml || '',
     fuMode: draft?.fuMode || (dueReminder ? 'none' : s.followUpMode || 'remind'),
     fuDays: draft?.fuDays || s.followUpDays || 3,
     fuTpl: draft?.fuTpl || s.followUpTemplateId || tpls.find((x) => /follow/i.test(x.name))?.id || tpls[0]?.id || '',
   };
   const nameFor = (e) => senderProfile({ gmailAccounts: [], ...s }, e).name;
+  const sigFor = (e) => senderProfile({ gmailAccounts: [], ...s }, e).signature;
+  const ins = l.insights || {};
+  const goal0 = (l.emailsSent || []).length ? 'followup' : ins.hiring?.length ? 'hiring' : 'intro';
+  const aiNote = ins.hiring?.length
+    ? `<div class="ai-note" id="m-ainote">Hiring: ${ins.hiring.slice(0, 6).map((h) => `<span class="role">${esc(h.title)}</span>`).join('')}</div>`
+    : `<div class="ai-note" id="m-ainote" ${ins.at ? '' : 'hidden'}>${ins.at ? 'No open roles were found on their profile.' : ''}</div>`;
   openSheet(`<h2>Email ${esc(l.firstName || D.fullName(l))} <span class="spacer"></span><button class="link" data-close>Close</button></h2>
     ${accounts.length > 1 ? `<div class="field"><label>From</label><select id="m-from">${accounts.map((e) => `<option ${e === st.from ? 'selected' : ''}>${esc(e)}</option>`).join('')}</select></div>` : `<p class="note" style="margin-top:-6px">From ${esc(nameFor(st.from) ? nameFor(st.from) + ' · ' : '')}${esc(st.from)}</p>`}
     <div class="field"><label>To</label><input id="m-to" type="email" inputmode="email" value="${esc(st.to)}" placeholder="name@company.com"></div>
-    <div class="field"><label>Template</label><select id="m-tpl"><option value="">— Write my own —</option>${tpls.map((x) => `<option value="${esc(x.id)}" ${x.id === st.templateId ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>
+    <div class="field"><label>Let Claude write it</label>
+      <div class="ai-row"><select id="m-goal">${[['intro', 'First email'], ['hiring', 'Help with their open roles'], ['followup', 'Follow up'], ['reengage', 'Re-engage'], ['meeting', 'Ask for a call']].map(([v, t]) => `<option value="${v}" ${v === goal0 ? 'selected' : ''}>${t}</option>`).join('')}</select>
+      <button class="btn ai sm" id="m-ai" type="button">✨ Write</button></div>${aiNote}</div>
+    <div class="field"><label>Or use a template</label><select id="m-tpl"><option value="">— Write my own —</option>${tpls.map((x) => `<option value="${esc(x.id)}" ${x.id === st.templateId ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>
     ${last ? `<label class="check"><input type="checkbox" id="m-reply" ${st.reply ? 'checked' : ''}> Reply in the same thread <span class="muted small">(${esc(last.subject.replace(/^re:\s*/i, ''))})</span></label>` : ''}
     <div class="field"><label>Subject</label><input id="m-sub" value="${esc(st.subject)}"></div>
-    <div class="field"><label>Message</label><textarea id="m-body" rows="9">${esc(st.body)}</textarea></div>
+    <div class="field"><label>Message</label><div id="m-body-host"></div>
+      <div class="ins"><button type="button" data-ins="first">First name</button><button type="button" data-ins="company">Company</button><button type="button" class="sig" data-ins="sig">✍ Signature</button></div></div>
     <div class="field"><label>Follow up</label>
       <div class="row2"><select id="m-fu"><option value="none">No follow-up</option><option value="remind">Remind me</option><option value="auto">Send automatically</option></select>
       <select id="m-fudays">${[1, 2, 3, 4, 5, 7, 10, 14].map((d) => `<option value="${d}" ${Number(st.fuDays) === d ? 'selected' : ''}>after ${d} day${d > 1 ? 's' : ''}</option>`).join('')}</select></div>
@@ -367,10 +377,35 @@ function compose(id, draft = null) {
     <button class="btn primary block" id="m-send">Send email</button>`, (sh, close) => {
     const vals = () => ({ ...l, email: $('#m-to', sh).value.trim() });
     const fromSel = () => ($('#m-from', sh) ? $('#m-from', sh).value : st.from);
+    const ed = globalThis.PMRich.create($('#m-body-host', sh), { placeholder: 'Write your message, pick a template, or let Claude write it.', rows: 8 });
+    ed.id = 'm-body';
+    if (st.bodyHtml) ed.innerHTML = st.bodyHtml; else ed.value = st.body;
+    sh.querySelectorAll('[data-ins]').forEach((b) => {
+      b.addEventListener('mousedown', (e) => e.preventDefault()); // keep the cursor in the message (the editor also remembers it)
+      b.addEventListener('click', () => {
+        const v = b.dataset.ins === 'sig' ? (sigFor(fromSel()) || '') : b.dataset.ins === 'first' ? (l.firstName || '') : (l.company || '');
+        if (!v) return toast(b.dataset.ins === 'sig' ? 'No signature set for this account (extension ▸ Settings ▸ Gmail).' : 'Not filled in for this contact.');
+        ed.insertText(b.dataset.ins === 'sig' ? '\n' + v : v);
+      });
+    });
+    $('#m-ai', sh).onclick = (e) => guard(async () => {
+      if (ed.value.trim() && !confirm('Replace your message with an AI draft?')) return;
+      const b = e.target; b.textContent = 'Writing…';
+      try {
+        const tpl = tpls.find((x) => x.id === $('#m-tpl', sh).value);
+        const base = tpl ? { subject: fillTemplate(tpl.subject, vals(), nameFor(fromSel())), body: fillTemplate(tpl.body, vals(), nameFor(fromSel()), '') } : null;
+        const r = await D.aiWrite({ leadId: l.id, goal: $('#m-goal', sh).value, from: fromSel(), base });
+        if (!$('#m-reply', sh)?.checked) $('#m-sub', sh).value = r.subject;
+        ed.value = r.body;
+        const note = $('#m-ainote', sh);
+        note.hidden = false;
+        note.innerHTML = (ins.hiring?.length ? `Hiring: ${ins.hiring.slice(0, 6).map((h) => `<span class="role">${esc(h.title)}</span>`).join('')}<br>` : '') + `✨ Angle used: ${esc(r.hook || '—')}`;
+      } finally { b.textContent = '✨ Write'; }
+    }, e.target);
     const applyTpl = () => {
       const tpl = tpls.find((x) => x.id === $('#m-tpl', sh).value);
       if (tpl) {
-        $('#m-body', sh).value = fillTemplate(tpl.body, vals(), nameFor(fromSel()), senderProfile({ gmailAccounts: [], ...s }, fromSel()).signature);
+        ed.value = withSignature(fillTemplate(tpl.body, vals(), nameFor(fromSel()), sigFor(fromSel())), sigFor(fromSel()));
         $('#m-sub', sh).value = fillTemplate(tpl.subject, vals(), nameFor(fromSel()));
       }
       applyReply();
@@ -389,7 +424,7 @@ function compose(id, draft = null) {
     if (!draft && st.templateId) applyTpl(); else applyReply();
 
     $('#m-send', sh).onclick = (e) => guard(async () => {
-      const to = $('#m-to', sh).value.trim(), subject = $('#m-sub', sh).value.trim(), body = $('#m-body', sh).value;
+      const to = $('#m-to', sh).value.trim(), subject = $('#m-sub', sh).value.trim(), body = ed.value, html = ed.html;
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return toast('Enter a valid email address');
       if (!subject || !body.trim()) return toast('Add a subject and a message');
       if (/\{\{\s*\w+\s*\}\}/.test(subject + body) && !confirm('The message still has a {{placeholder}} in it. Send anyway?')) return;
@@ -398,7 +433,7 @@ function compose(id, draft = null) {
       const from = reply && last?.from && accounts.includes(last.from) ? last.from : fromSel();
       const followUp = { mode: $('#m-fu', sh).value, days: Number($('#m-fudays', sh).value), templateId: $('#m-futpl', sh).value };
       try {
-        const sent = await D.sendEmail({ from, to, subject, text: body, threadId: reply ? last.threadId : undefined, inReplyTo: reply ? last.rfcId : undefined });
+        const sent = await D.sendEmail({ from, to, subject, text: body, html, threadId: reply ? last.threadId : undefined, inReplyTo: reply ? last.rfcId : undefined });
         if (to !== l.email) D.updateLead(l.id, { email: to });
         const tpl = tpls.find((x) => x.id === $('#m-tpl', sh).value);
         D.recordSent(l.id, { subject, templateName: tpl?.name, sent, followUp, doneFollowUpId: dueReminder ? fu.id : '', isReply: reply });
@@ -406,7 +441,7 @@ function compose(id, draft = null) {
         toast(`Sent to ${to}${followUp.mode !== 'none' ? ' · follow-up scheduled' : ''}`);
       } catch (err) {
         if (err instanceof auth.NeedsAuth) {
-          sessionStorage.setItem('pm_draft', JSON.stringify({ leadId: l.id, from, to, templateId: $('#m-tpl', sh).value, reply, subject, body, fuMode: followUp.mode, fuDays: followUp.days, fuTpl: followUp.templateId }));
+          sessionStorage.setItem('pm_draft', JSON.stringify({ leadId: l.id, from, to, templateId: $('#m-tpl', sh).value, reply, subject, body, bodyHtml: ed.innerHTML, fuMode: followUp.mode, fuDays: followUp.days, fuTpl: followUp.templateId }));
         }
         throw err;
       }
