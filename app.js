@@ -7,8 +7,9 @@ import { fillTemplate } from './lib/followups.js';
 import { combine, summarize, dayKey, kindOfCat } from './lib/tracker.js';
 import { periodRange, aggregate, shiftPeriod } from './lib/periods.js';
 import { fmtMin } from './lib/report.js';
+import { extrasHtml, wireExtras } from './home-extras.js';
 
-const VERSION = '1.9.0-202610281903';
+const VERSION = '1.10.6-202610301801';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -161,6 +162,7 @@ function home(v) {
   const item = (href, t, sub, end = '') => `<a class="row" href="${href}"><div class="main"><div class="t">${esc(t)}</div><div class="sub">${esc(sub)}</div></div>${end}<span class="chev">›</span></a>`;
   v.innerHTML = `
     <div class="hello"><span class="muted">${new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}</span><b>Good ${hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'}${first ? ', ' + esc(first) : ''}</b></div>
+    ${extrasHtml()}
     <div class="kpis">
       ${tile('Revenue this month', esc(money(m.revenueMonth)), `${m.dealsWonMonth} won · MRR ${esc(money(m.mrr))}`, '#/pipeline', 'accent')}
       ${tile('Open pipeline', esc(money(m.openValue)), `${m.openCount} open deal${m.openCount === 1 ? '' : 's'}`, '#/pipeline')}
@@ -188,6 +190,7 @@ function home(v) {
         ${a.overdueClose.slice(0, 3).map((d) => item('#/pipeline', d.title, `Expected close ${fmtShort(new Date(d.expectedClose).getTime())}`, '<span class="pill due">Overdue</span>')).join('')}
       </div>
     </div>`;
+  wireExtras(v, toast);
 }
 const scoreColor = (s) => (s >= 70 ? '#1f9d63' : s >= 45 ? '#b7791f' : '#c2410c');
 

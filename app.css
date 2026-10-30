@@ -242,3 +242,48 @@ input:focus, select:focus, textarea:focus { background: var(--card); border-colo
 .ins { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .ins button { border: 0; background: var(--field); color: var(--ink-2); border-radius: 9px; padding: 7px 11px; font-size: 13.5px; font-weight: 600; cursor: pointer; }
 .ins button.sig { background: var(--accent-soft); color: var(--accent-d); }
+
+/* ---------- Home extras: motivation, top 3, time, Todoist ---------- */
+.mq { display: flex; align-items: center; gap: 8px; padding: 10px 8px 10px 14px; border-radius: 16px; margin: 0 0 12px; background: linear-gradient(90deg, rgba(255,107,26,.10), rgba(52,97,255,.10)); }
+.mq-line { flex: 1; font-size: 14.5px; font-weight: 650; line-height: 1.4; }
+.mq-redo { width: 32px; height: 32px; flex: none; font-size: 16px; }
+.spin { animation: spin 1s linear infinite; }
+.fx { background: linear-gradient(var(--card), var(--card)) padding-box, var(--g-ai) border-box; border: 1px solid transparent; }
+.fx-head { display: flex; align-items: center; gap: 8px; }
+.fx-head .spacer { flex: 1; }
+.fx-head .icon-btn { width: 34px; height: 34px; font-size: 17px; }
+.fx-big { font-size: 18px; letter-spacing: -.01em; }
+.fx-sub { display: flex; align-items: center; gap: 10px; margin: 2px 0 8px; }
+.fx-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.fx-list.stale { opacity: .45; }
+.fx-list li, .td-list li { display: flex; gap: 12px; align-items: flex-start; }
+.fx-list a, .td-list a { color: var(--ink); text-decoration: none; font-weight: 650; font-size: 15px; line-height: 1.35; }
+.fx-why { display: block; font-size: 13px; color: var(--ink-2); margin-top: 2px; }
+.td-check { flex: none; width: 24px; height: 24px; margin-top: 1px; border-radius: 50%; border: 2px solid #b9c0d0; background: transparent; padding: 0; cursor: pointer; }
+.td-check.p4 { border-color: #e5484d; } .td-check.p3 { border-color: #f59e0b; } .td-check.p2 { border-color: #3461ff; }
+.td-check.done { background: #1f9d63; border-color: #1f9d63; }
+select.td-view { width: auto; max-width: 60vw; padding: 6px 28px 6px 12px; font-size: 13.5px; font-weight: 650; border-radius: 999px; border: 1px solid var(--line); background: var(--field); color: var(--ink); text-transform: none; letter-spacing: 0; }
+#h-todoist h3 { align-items: center; gap: 8px; justify-content: flex-start; }
+.td-list { list-style: none; margin: 0 0 10px; padding: 0; }
+.td-list li { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.td-list li:last-child { border-bottom: 0; }
+.td-list .m { min-width: 0; flex: 1; }
+.td-list .meta { display: flex; gap: 8px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-3); margin-top: 2px; }
+.age { font-weight: 650; color: var(--ink-2); }
+.age.over { color: var(--danger); } .age.today, .age.old { color: var(--accent-d); }
+.td-add { display: flex; gap: 6px; }
+.td-add input { flex: 2; min-width: 0; padding: 10px 12px; border: 1px solid transparent; border-radius: 12px; background: var(--field); font-size: 16px; outline: none; }
+.td-add input.when { flex: 1; }
+.td-add input:focus { border-color: var(--accent); background: var(--card); }
+.tzc .tz-row { display: flex; align-items: center; justify-content: space-between; }
+.tzc .tz-row > div { display: flex; flex-direction: column; }
+.tzc .tz-row .r { text-align: right; }
+.tz-name { font-size: 12.5px; font-weight: 650; color: var(--ink-2); }
+.tzc b { font-size: 24px; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.tz-day { font-size: 12px; color: var(--ink-3); }
+.tz-arrow { color: var(--ink-3); font-size: 18px; }
+.tzc input[type=range] { width: 100%; margin: 14px 0 4px; -webkit-appearance: none; appearance: none; background: transparent; height: 28px; padding: 0; border: 0; box-shadow: none; }
+.tzc input[type=range]::-webkit-slider-runnable-track { height: 8px; border-radius: 999px; background: var(--tz-track); }
+.tzc input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 26px; height: 26px; margin-top: -9px; border-radius: 50%; background: #fff; border: 3px solid var(--accent); box-shadow: 0 2px 6px rgba(20,32,58,.3); }
+.tz-scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-3); }
+.tz-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 13px; color: var(--ink-2); min-height: 20px; }

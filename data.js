@@ -359,3 +359,127 @@ export async function findEmail(linkedinUrl) {
   if (r.status >= 300) throw new Error('SalesQL: ' + (r.data?.message || r.status));
   return normalizePerson(r.data);
 }
+
+// =====================================================================
+// Todoist, today's top 3 and the motivation line (Home screen)
+// =====================================================================
+import * as todoist from './lib/todoist.js';
+import * as focusLib from './lib/focus.js';
+import * as motivateLib from './lib/motivate.js';
+
+export const T = { cache: null, loading: false, error: '', focus: null, quote: null };
+const lsGet = (k) => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* private mode */ } };
+T.cache = lsGet('pm_todoist'); T.focus = lsGet('pm_focus'); T.quote = lsGet('pm_quote');
+const tdDay = (t) => new Date(t).toDateString();
+
+// Todoist straight from the phone; if the browser blocks it, through your cloud script.
+let tdViaCloud = false;
+async function tdCall(path, { method = 'GET', body } = {}) {
+  const s = settings();
+  if (!s.todoistToken) throw new Error('Connect Todoist in the extension first (Settings ▸ Todoist).');
+  if (!tdViaCloud) {
+    try {
+      const res = await fetch('https://api.todoist.com/api/v1' + path, { method, headers: { Authorization: 'Bearer ' + s.todoistToken, ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
+      if (res.status === 401 || res.status === 403) throw new Error('Todoist rejected the API token.');
+      if (res.status === 204) return {};
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error('Todoist: ' + (j.error || res.status));
+      return j;
+    } catch (e) {
+      if (!(e instanceof TypeError)) throw e; // TypeError = blocked by the browser → use the cloud script
+      tdViaCloud = true;
+    }
+  }
+  if (!s.cloudUrl || !s.cloudSecret) throw new Error('Todoist can\'t be reached from the phone directly. Connect Cloud reports in the extension so the phone can go through it.');
+  const r = await cloudCall({ url: s.cloudUrl, secret: s.cloudSecret }, { type: 'todoist', key: s.todoistToken, path, method, body });
+  if (r.status === 401 || r.status === 403) throw new Error('Todoist rejected the API token.');
+  if (r.status >= 300) throw new Error('Todoist: ' + ((r.data && r.data.error) || r.status));
+  return r.data || {};
+}
+async function tdAll(path, key) {
+  const out = [];
+  let cursor = '';
+  for (let i = 0; i < 25; i++) {
+    const r = await tdCall(path + (path.includes('?') ? '&' : '?') + 'limit=200' + (cursor ? '&cursor=' + encodeURIComponent(cursor) : ''));
+    out.push(...(r[key] || r.results || r.items || []));
+    cursor = r.next_cursor;
+    if (!cursor) break;
+  }
+  return out;
+}
+
+export async function todoistLoad({ force = false } = {}) {
+  if (!settings().todoistToken) return null;
+  if (T.loading) return T.cache;
+  if (!force && T.cache && Date.now() - T.cache.at < 5 * 60000) return T.cache;
+  T.loading = true;
+  try {
+    const now = Date.now();
+    const start = new Date(now - 8 * 864e5); start.setHours(0, 0, 0, 0);
+    const [projects, tasks] = await Promise.all([tdAll('/projects', 'results'), tdAll('/tasks', 'results')]);
+    let done = [];
+    try { done = await tdAll(`/tasks/completed/by_completion_date?since=${encodeURIComponent(start.toISOString())}&until=${encodeURIComponent(new Date(now + 60000).toISOString())}`, 'items'); } catch { /* optional */ }
+    T.cache = todoist.buildCache({ projects, tasks, done }, now);
+    T.error = '';
+    lsSet('pm_todoist', T.cache);
+  } catch (e) { T.error = e.message; }
+  finally { T.loading = false; emit(); }
+  return T.cache;
+}
+export const todoistView = () => settings().todoistView || todoist.DEFAULT_VIEW;
+export const todoistViewed = () => (T.cache ? todoist.applyView(T.cache, todoistView()) : null);
+export async function todoistClose(id) { await tdCall(`/tasks/${encodeURIComponent(id)}/close`, { method: 'POST' }); await todoistLoad({ force: true }); }
+export async function todoistAdd(content, due, projectId) {
+  const body = { content };
+  if (due) body.due_string = due;
+  if (projectId) body.project_id = projectId;
+  await tdCall('/tasks', { method: 'POST', body });
+  await todoistLoad({ force: true });
+}
+// Same setting as the extension's board picker (it syncs both ways).
+export const setTodoistView = (view) => commit((s) => {
+  s.settings = { ...(s.settings || {}), todoistView: view };
+  s.settingsMeta = { ...(s.settingsMeta || {}), todoistView: Date.now() };
+  return view;
+});
+
+// Claude's top 3 for today (cached on the phone; re-picked when the tasks or board change).
+export async function focusLoad({ force = false } = {}) {
+  const s = settings();
+  const v = todoistViewed();
+  if (!v) return null;
+  const cands = focusLib.candidates(v.pending || []);
+  const key = todoistView() + '|' + cands.map((t) => t.id).sort().join(',');
+  const prev = T.focus;
+  if (!force && prev && tdDay(prev.at) === tdDay(Date.now()) && (prev.key === key ? Date.now() - prev.at < 6 * 3600e3 : Date.now() - prev.at < 20 * 60000 && prev.view === todoistView())) return prev;
+  if (focusBusy) return prev;
+  focusBusy = true;
+  let out = { picks: focusLib.fallbackPicks(v.pending || []), by: 'rules', error: '' };
+  if (s.anthropicKey && cands.length) {
+    try { out = { ...(await focusLib.askClaude({ gmailAccounts: [], ...s }, cands, focusLib.crmContextFrom(s, leads(), deals()))), by: 'claude', error: '' }; } catch (e) { out.error = e.message; }
+  }
+  focusBusy = false;
+  T.focus = { at: Date.now(), key, view: todoistView(), ...out };
+  lsSet('pm_focus', T.focus);
+  emit();
+  return T.focus;
+}
+
+// The motivation line (same writer as the extension; refreshed about every 5 hours).
+export async function quoteLoad({ force = false } = {}) {
+  const s = settings();
+  const prev = T.quote;
+  if (!force && prev && tdDay(prev.at) === tdDay(Date.now()) && Date.now() - prev.at < 5 * 3600e3 && (prev.by === 'claude' || !s.anthropicKey || (prev.error && Date.now() - prev.at < 20 * 60000))) return prev;
+  if (quoteBusy) return prev;
+  quoteBusy = true;
+  try {
+  const d = motivateLib.gatherFrom({ s: { gmailAccounts: [], ...s }, leads: leads(), deals: deals(), sums: S.snap?.daySummaries || {}, reports: S.snap?.dailyReports || {}, tdView: todoistViewed() });
+  const r = await motivateLib.writeLine({ gmailAccounts: [], ...s }, d);
+  T.quote = { at: Date.now(), ...r };
+  lsSet('pm_quote', T.quote);
+  } finally { quoteBusy = false; }
+  emit();
+  return T.quote;
+}
+let quoteBusy = false, focusBusy = false;
