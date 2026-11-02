@@ -1,7 +1,7 @@
 {
-  "name": "Prospect Mailer",
-  "short_name": "Prospect",
-  "description": "Your Prospect Mailer CRM on the go — contacts, pipeline, follow-ups and daily reports.",
+  "name": "Pitchbird",
+  "short_name": "Pitchbird",
+  "description": "Your Pitchbird CRM on the go — contacts, pipeline, follow-ups and daily reports.",
   "id": "./",
   "start_url": "./#/home",
   "scope": "./",

@@ -1,4 +1,4 @@
-# Publish the Prospect Mailer phone app (about 10 minutes, once)
+# Publish the Pitchbird phone app (about 10 minutes, once)
 
 The app is a set of files that needs a free web address. GitHub Pages works well.
 

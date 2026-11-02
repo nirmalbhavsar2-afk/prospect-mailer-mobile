@@ -1,7 +1,7 @@
 // Offline support: keeps a copy of the app so it opens instantly and works without signal.
 // Your data is cached separately (IndexedDB); Google API calls are never cached here.
-const CACHE = 'prospect-mailer-1.10.6-202610301801';
-const SHELL = ['./', './index.html', './app.css?v=1.10.6-202610301801', './app.js?v=1.10.6-202610301801', './manifest.webmanifest', './icons/icon-192.png', './icons/apple-touch-icon.png'];
+const CACHE = 'prospect-mailer-1.11.0-202611020922';
+const SHELL = ['./', './index.html', './app.css?v=1.11.0-202611020922', './app.js?v=1.11.0-202611020922', './lib/bird.js?v=1.11.0-202611020922', './manifest.webmanifest', './icons/icon-192.png', './icons/apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -14,7 +14,8 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
   // network first (so updates arrive straight away), cached copy when offline
   e.respondWith(
-    fetch(req).then((res) => {
+    // 'no-cache' = always check GitHub for a newer copy, so new files are never mixed with stale ones
+    fetch(req, { cache: 'no-cache' }).then((res) => {
       if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
       return res;
     }).catch(() => caches.match(req, { ignoreSearch: req.mode === 'navigate' }).then((r) => r || caches.match('./index.html'))),

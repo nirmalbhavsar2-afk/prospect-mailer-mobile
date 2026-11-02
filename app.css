@@ -28,6 +28,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 /* top bar */
 .top { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 6px; padding: calc(var(--top) + 8px) 12px 8px; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
+.brand-mk { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; flex: none; margin-left: 4px; background: linear-gradient(135deg,#ff7a1a 0%,#e2508f 55%,#3461ff 100%); box-shadow: 0 3px 10px rgba(242,84,27,.28); }
+.brand-mk[hidden] { display: none; }
 .top h1 { flex: 1; margin: 0; font-size: 18px; font-weight: 750; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .icon-btn { border: 0; background: transparent; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; color: var(--ink-2); cursor: pointer; }
 .icon-btn:active { background: var(--line); }

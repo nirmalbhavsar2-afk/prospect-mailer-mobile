@@ -92,7 +92,7 @@ export function push() {
     S.syncing = true; emit();
     try {
       const f = S.fileId ? { id: S.fileId } : await findFile();
-      if (!f) throw new Error('Your Prospect Mailer data was not found in this Google account.');
+      if (!f) throw new Error('Your Pitchbird data was not found in this Google account.');
       const remote = await download(f.id);
       const merged = merge(S.snap, remote);
       await drive(`${UPLOAD}/${f.id}?uploadType=media`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...merged, exportedAt: Date.now() }) });

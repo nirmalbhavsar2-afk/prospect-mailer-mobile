@@ -1,4 +1,4 @@
-// Prospect Mailer — mobile companion. Same data as the Chrome extension, via your Google Drive.
+// Pitchbird — mobile companion. Same data as the Chrome extension, via your Google Drive.
 import * as D from './data.js';
 import * as auth from './auth.js';
 import * as crm from './lib/crm.js';
@@ -9,7 +9,7 @@ import { periodRange, aggregate, shiftPeriod } from './lib/periods.js';
 import { fmtMin } from './lib/report.js';
 import { extrasHtml, wireExtras } from './home-extras.js';
 
-const VERSION = '1.10.6-202610301801';
+const VERSION = '1.11.0-202611020922';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -61,7 +61,7 @@ function askAuth(e) {
 // =====================================================================
 // ROUTER
 // =====================================================================
-const TITLES = { home: 'Prospect Mailer', contacts: 'Contacts', contact: 'Contact', pipeline: 'Pipeline', followups: 'Follow-ups', day: 'My Day', add: 'Add from LinkedIn', settings: 'Settings' };
+const TITLES = { home: 'Pitchbird', contacts: 'Contacts', contact: 'Contact', pipeline: 'Pipeline', followups: 'Follow-ups', day: 'My Day', add: 'Add from LinkedIn', settings: 'Settings' };
 const route = () => { const [, name = 'home', arg = ''] = location.hash.split('/'); return { name: name.split('?')[0] || 'home', arg: decodeURIComponent(arg || '') }; };
 
 function render() {
@@ -70,7 +70,8 @@ function render() {
   const signedIn = !!auth.mainEmail();
   const tab = name === 'contact' ? 'contacts' : name;
   $$('#tabs a').forEach((a) => a.classList.toggle('on', a.dataset.tab === tab));
-  $('#title').textContent = TITLES[name] || 'Prospect Mailer';
+  $('#title').textContent = TITLES[name] || 'Pitchbird';
+  $('#brand-mk').hidden = name !== 'home';
   $('#back').hidden = !['contact', 'add', 'settings'].includes(name);
   $('#tabs').hidden = !signedIn || !D.S.snap;
   $('#fab').hidden = !signedIn || !D.S.snap || !['home', 'contacts'].includes(name);
@@ -84,7 +85,11 @@ function render() {
     return;
   }
   const screens = { home, contacts, contact, pipeline, followups, day, add, settings: settingsScreen };
-  (screens[name] || home)(view, arg);
+  try { (screens[name] || home)(view, arg); }
+  catch (e) {
+    console.error(e);
+    view.innerHTML = `<div class="card"><h3>Something went wrong on this screen</h3><p class="muted small">${esc(e.message)}</p><p class="muted small">Usually this means the phone still has an older copy of a file. Close the app completely and open it again; if it stays, send this message to support.</p><button class="btn secondary sm" onclick="location.reload()">Reload</button></div>`;
+  }
 }
 window.addEventListener('hashchange', () => {
   if (route().name !== 'add') sessionStorage.removeItem('pm_share');
@@ -120,10 +125,10 @@ function renderStatus() {
 function welcome(v, expired = false) {
   v.innerHTML = `<div class="welcome">
     <img src="icons/icon-192.png" alt="">
-    <h2>${expired ? 'Welcome back' : 'Prospect Mailer'}</h2>
+    <h2>${expired ? 'Welcome back' : 'Pitchbird'}</h2>
     <p>${expired ? 'Your Google sign-in expired. Continue to load your latest data.' : 'Sign in with the Google account you sync the Chrome extension with. Your contacts, pipeline, follow-ups and reports appear here.'}</p>
     <button class="btn primary" id="signin">${expired ? 'Continue' : 'Sign in with Google'}</button>
-    <p class="note" style="margin-top:16px">Google may say the app isn't verified — it's your own private app. Tap <b>Advanced → Go to Prospect Mailer</b> and allow access.</p>
+    <p class="note" style="margin-top:16px">Google may say the app isn't verified — it's your own private app. Tap <b>Advanced → Go to Pitchbird</b> (it may still say Prospect Mailer) and allow access.</p>
   </div>`;
   $('#signin').onclick = () => auth.signIn({ purpose: 'main', email: expired ? auth.mainEmail() : '', choose: !expired });
 }
@@ -131,7 +136,7 @@ function noData(v) {
   v.innerHTML = `<div class="welcome">
     <img src="icons/icon-192.png" alt="">
     <h2>No data found</h2>
-    <p>${esc(auth.mainEmail())} has no Prospect Mailer data yet. Sign in with the account you chose in the extension under <b>Settings → Sync &amp; backup</b>.</p>
+    <p>${esc(auth.mainEmail())} has no Pitchbird data yet. Sign in with the account you chose in the extension under <b>Settings → Sync &amp; backup</b>.</p>
     <button class="btn primary" id="switch">Use another Google account</button>
   </div>`;
   $('#switch').onclick = async () => { await D.signOutAll(); auth.signIn({ purpose: 'main', choose: true }); };
@@ -162,7 +167,7 @@ function home(v) {
   const item = (href, t, sub, end = '') => `<a class="row" href="${href}"><div class="main"><div class="t">${esc(t)}</div><div class="sub">${esc(sub)}</div></div>${end}<span class="chev">›</span></a>`;
   v.innerHTML = `
     <div class="hello"><span class="muted">${new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}</span><b>Good ${hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'}${first ? ', ' + esc(first) : ''}</b></div>
-    ${extrasHtml()}
+    ${safeExtras()}
     <div class="kpis">
       ${tile('Revenue this month', esc(money(m.revenueMonth)), `${m.dealsWonMonth} won · MRR ${esc(money(m.mrr))}`, '#/pipeline', 'accent')}
       ${tile('Open pipeline', esc(money(m.openValue)), `${m.openCount} open deal${m.openCount === 1 ? '' : 's'}`, '#/pipeline')}
@@ -190,7 +195,11 @@ function home(v) {
         ${a.overdueClose.slice(0, 3).map((d) => item('#/pipeline', d.title, `Expected close ${fmtShort(new Date(d.expectedClose).getTime())}`, '<span class="pill due">Overdue</span>')).join('')}
       </div>
     </div>`;
-  wireExtras(v, toast);
+  try { wireExtras(v, toast); } catch (e) { console.error(e); }
+}
+// The new Home sections must never blank the whole screen (e.g. while the phone still has an older file cached).
+function safeExtras() {
+  try { return extrasHtml(); } catch (e) { console.error(e); return `<div class="card"><div class="muted small">Couldn't show today's tasks: ${esc(e.message)}. Close and reopen the app in a few minutes.</div></div>`; }
 }
 const scoreColor = (s) => (s >= 70 ? '#1f9d63' : s >= 45 ? '#b7791f' : '#c2410c');
 
@@ -440,6 +449,7 @@ function compose(id, draft = null) {
         if (to !== l.email) D.updateLead(l.id, { email: to });
         const tpl = tpls.find((x) => x.id === $('#m-tpl', sh).value);
         D.recordSent(l.id, { subject, templateName: tpl?.name, sent, followUp, doneFollowUpId: dueReminder ? fu.id : '', isReply: reply });
+        globalThis.PBBird?.fly($('#m-send', sh));
         close();
         toast(`Sent to ${to}${followUp.mode !== 'none' ? ' · follow-up scheduled' : ''}`);
       } catch (err) {
@@ -550,7 +560,7 @@ function followups(v) {
       <div class="field" style="margin-top:12px"><label>Change date</label><input type="datetime-local" id="f-when" value="${localInput(f.due)}"></div>
       <div class="btns"><button class="btn secondary" id="f-move">Save new date</button><button class="btn secondary" id="f-open">Open contact</button></div>
       <button class="btn danger block" id="f-cancel" style="margin-top:6px">Cancel follow-up</button>`, (sh, close) => {
-      $('#f-send', sh).onclick = (e) => guard(async () => { const subj = await D.sendFollowUpNow(f.lead.id, f.id); close(); toast('Sent: ' + subj); }, e.target);
+      $('#f-send', sh).onclick = (e) => guard(async () => { const subj = await D.sendFollowUpNow(f.lead.id, f.id); globalThis.PBBird?.fly($('#f-send', sh)); close(); toast('Sent: ' + subj); }, e.target);
       $('#f-move', sh).onclick = () => { const t = new Date($('#f-when', sh).value).getTime(); if (!t) return; D.fuReschedule(f.lead.id, f.id, t); close(); toast('Rescheduled'); };
       $('#f-open', sh).onclick = () => { close(); location.hash = '#/contact/' + f.lead.id; };
       $('#f-cancel', sh).onclick = () => { D.fuCancel(f.lead.id, f.id); close(); toast('Follow-up cancelled'); };
@@ -664,7 +674,7 @@ function week(v, seg) {
 }
 
 // =====================================================================
-// ADD FROM LINKEDIN (also where Android's Share → Prospect lands)
+// ADD FROM LINKEDIN (also where Android's Share → Pitchbird lands)
 // =====================================================================
 function parseShare(sh) {
   const all = [sh.url, sh.text, sh.title].filter(Boolean).join(' ');
@@ -687,7 +697,7 @@ function add(v) {
   v.innerHTML = `
     <div class="card">
       <div class="field"><label>LinkedIn profile link</label><input id="x-url" type="url" inputmode="url" placeholder="https://www.linkedin.com/in/…" value="${esc(pre.url)}"></div>
-      <p class="note" style="margin-top:-4px">On Android: in the LinkedIn app open a profile → Share → <b>Prospect</b>. On iPhone: Share → Copy link, then paste here.</p>
+      <p class="note" style="margin-top:-4px">On Android: in the LinkedIn app open a profile → Share → <b>Pitchbird</b>. On iPhone: Share → Copy link, then paste here.</p>
       <div id="x-exists"></div>
       <button class="btn secondary block" id="x-find">🔍 Find email with SalesQL</button>
     </div>
@@ -759,7 +769,7 @@ function settingsScreen(v) {
       <p class="note" style="margin-top:-4px">Each Gmail address signs in once on this phone the first time you send from it.</p>
       <div class="list">${accts.map((e) => `<div class="row"><div class="main"><div class="t">${esc(e)}</div><div class="sub">${auth.hasToken(e, 'gmail') ? 'Ready on this phone' : e === main ? 'Ready after your next sign-in' : 'Not signed in on this phone yet'}</div></div>${auth.hasToken(e, 'gmail') ? '<span class="pill won">Ready</span>' : `<button class="btn secondary sm" data-acct="${esc(e)}">Sign in</button>`}</div>`).join('') || '<div class="muted small">No Gmail accounts — add them in the extension.</div>'}</div></div>
     ${standalone ? '' : `<div class="card"><h3>Add to your home screen</h3>
-      <p class="small" style="margin:0">${ios ? 'In Safari, tap the <b>Share</b> button, then <b>Add to Home Screen</b>.' : 'In Chrome, tap <b>⋮</b> then <b>Install app</b> (or <b>Add to Home screen</b>). After installing, Prospect shows up in the LinkedIn app\'s Share menu.'}</p></div>`}
+      <p class="small" style="margin:0">${ios ? 'In Safari, tap the <b>Share</b> button, then <b>Add to Home Screen</b>.' : 'In Chrome, tap <b>⋮</b> then <b>Install app</b> (or <b>Add to Home screen</b>). After installing, Pitchbird shows up in the LinkedIn app\'s Share menu.'}</p></div>`}
     <div class="card"><h3>About</h3><div class="kv"><span>Version</span><b>${esc(VERSION)}</b><span>Templates</span><b>${D.templates().length}</b><span>Contacts</span><b>${D.leads().length}</b></div>
       <p class="note">Templates, Gmail accounts and other settings are managed in the Chrome extension.</p></div>`;
   $('#s-sync').onclick = (e) => guard(async () => { await D.pull(); toast(D.S.error ? D.S.error : 'Up to date'); render(); }, e.target);
