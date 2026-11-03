@@ -3,7 +3,7 @@
 import { merge } from './lib/sync.js';
 import { uid, normalizeLinkedinUrl, senderProfile, withSignature } from './lib/store.js';
 import * as crm from './lib/crm.js';
-import { computeDue, fillTemplate } from './lib/followups.js';
+import { computeDue, fillTemplate, contentOf, nextStep } from './lib/followups.js';
 import { buildMime, textToHtml } from './lib/gmail.js';
 import { normalizePerson } from './lib/salesql.js';
 import * as aiwrite from './lib/aiwrite.js';
@@ -222,7 +222,7 @@ export function cloudQueue(leadId) {
     const s = settings();
     for (const fu of (l.followUps || []).filter((f) => f.status === 'scheduled' && f.mode === 'auto')) {
       const snd = cloudFor(fu.from);
-      const tpl = templates().find((t) => t.id === fu.templateId);
+      const tpl = contentOf(fu, templates());
       if (!snd || !tpl) continue;
       const prof = senderProfile({ gmailAccounts: [], ...s }, fu.from);
       const text = withSignature(fillTemplate(tpl.body, l, prof.name, prof.signature), prof.signature);
@@ -303,7 +303,7 @@ export async function sendFollowUpNow(leadId, fuId) {
   const l = lead(leadId);
   const fu = l?.followUps?.find((f) => f.id === fuId);
   if (!fu) throw new Error('Follow-up not found');
-  const tpl = templates().find((t) => t.id === fu.templateId);
+  const tpl = contentOf(fu, templates());
   if (!tpl) throw new Error(`Template “${fu.templateName || 'follow-up'}” no longer exists.`);
   const prof = senderProfile({ gmailAccounts: [], ...settings() }, fu.from);
   const subject = fu.threadId ? (/^re:/i.test(fu.origSubject) ? fu.origSubject : 'Re: ' + fu.origSubject) : fillTemplate(tpl.subject, l, prof.name);
@@ -318,6 +318,8 @@ export async function sendFollowUpNow(leadId, fuId) {
     const x = s.leads.find((y) => y.id === leadId);
     const t = now();
     x.followUps = x.followUps.map((f) => (f.id === fuId ? { ...f, status: 'sent', sentAt: t, error: '', updatedAt: t } : f));
+    const n = nextStep(fu, t, settings().followUpBusinessDays !== false);
+    if (n) x.followUps.push({ ...n, deviceId: 'any' });
     x.emailsSent = [...(x.emailsSent || []), { date: t, subject, templateName: tpl.name, messageId: sent.id, threadId: sent.threadId, rfcId: sent.rfcId, from: sent.from, followUp: true }];
     return touch(x, {});
   });

@@ -1,7 +1,7 @@
 // Offline support: keeps a copy of the app so it opens instantly and works without signal.
 // Your data is cached separately (IndexedDB); Google API calls are never cached here.
-const CACHE = 'prospect-mailer-1.11.0-202611020922';
-const SHELL = ['./', './index.html', './app.css?v=1.11.0-202611020922', './app.js?v=1.11.0-202611020922', './lib/bird.js?v=1.11.0-202611020922', './manifest.webmanifest', './icons/icon-192.png', './icons/apple-touch-icon.png'];
+const CACHE = 'prospect-mailer-1.12.0-202611030230';
+const SHELL = ['./', './index.html', './app.css?v=1.12.0-202611030230', './app.js?v=1.12.0-202611030230', './lib/bird.js?v=1.12.0-202611030230', './manifest.webmanifest', './icons/icon-192.png', './icons/apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
