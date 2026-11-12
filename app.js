@@ -9,7 +9,7 @@ import { periodRange, aggregate, shiftPeriod } from './lib/periods.js';
 import { fmtMin } from './lib/report.js';
 import { extrasHtml, wireExtras } from './home-extras.js';
 
-const VERSION = '1.12.0-202611030230';
+const VERSION = '1.14.1-202611121451';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -375,7 +375,9 @@ function compose(id, draft = null) {
     <div class="field"><label>To</label><input id="m-to" type="email" inputmode="email" value="${esc(st.to)}" placeholder="name@company.com"></div>
     <div class="field"><label>Let Claude write it</label>
       <div class="ai-row"><select id="m-goal">${[['intro', 'First email'], ['hiring', 'Help with their open roles'], ['followup', 'Follow up'], ['reengage', 'Re-engage'], ['meeting', 'Ask for a call']].map(([v, t]) => `<option value="${v}" ${v === goal0 ? 'selected' : ''}>${t}</option>`).join('')}</select>
-      <button class="btn ai sm" id="m-ai" type="button">✨ Write</button></div>${aiNote}</div>
+      <button class="btn ai sm" id="m-ai" type="button">✨ Write</button></div>
+      <div class="row2" style="margin-top:8px"><select id="m-industry">${[['auto', 'Industry: auto'], ['construction', 'Construction'], ['robotics', 'Robotics'], ['automation', 'Industrial Automation'], ['engineering', 'Engineering'], ['healthcare', 'Healthcare'], ['legal', 'Legal'], ['it', 'IT / Software'], ['finance', 'Finance & Accounting'], ['manufacturing', 'Manufacturing']].map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join('')}</select>
+      <select id="m-audience"><option value="auto">Audience: auto</option><option value="staffing">Staffing agency</option><option value="employer">Direct employer</option></select></div>${aiNote}</div>
     <div class="field"><label>Or use a template</label><select id="m-tpl"><option value="">— Write my own —</option>${tpls.map((x) => `<option value="${esc(x.id)}" ${x.id === st.templateId ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>
     ${last ? `<label class="check"><input type="checkbox" id="m-reply" ${st.reply ? 'checked' : ''}> Reply in the same thread <span class="muted small">(${esc(last.subject.replace(/^re:\s*/i, ''))})</span></label>` : ''}
     <div class="field"><label>Subject</label><input id="m-sub" value="${esc(st.subject)}"></div>
@@ -406,12 +408,12 @@ function compose(id, draft = null) {
       try {
         const tpl = tpls.find((x) => x.id === $('#m-tpl', sh).value);
         const base = tpl ? { subject: fillTemplate(tpl.subject, vals(), nameFor(fromSel())), body: fillTemplate(tpl.body, vals(), nameFor(fromSel()), '') } : null;
-        const r = await D.aiWrite({ leadId: l.id, goal: $('#m-goal', sh).value, from: fromSel(), base });
+        const r = await D.aiWrite({ leadId: l.id, goal: $('#m-goal', sh).value, from: fromSel(), base, industry: $('#m-industry', sh).value, audience: $('#m-audience', sh).value });
         if (!$('#m-reply', sh)?.checked) $('#m-sub', sh).value = r.subject;
         ed.value = r.body;
         const note = $('#m-ainote', sh);
         note.hidden = false;
-        note.innerHTML = (ins.hiring?.length ? `Hiring: ${ins.hiring.slice(0, 6).map((h) => `<span class="role">${esc(h.title)}</span>`).join('')}<br>` : '') + `✨ Angle used: ${esc(r.hook || '—')}`;
+        note.innerHTML = (ins.hiring?.length ? `Hiring: ${ins.hiring.slice(0, 6).map((h) => `<span class="role">${esc(h.title)}</span>`).join('')}<br>` : '') + `✨ ${r.industry ? esc(r.industry) + ' · ' : ''}${r.audience === 'employer' ? 'direct employer' : 'staffing agency'} · Angle used: ${esc(r.hook || '—')}`;
       } finally { b.textContent = '✨ Write'; }
     }, e.target);
     const applyTpl = () => {

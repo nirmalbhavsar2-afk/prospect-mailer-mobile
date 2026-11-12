@@ -288,7 +288,7 @@ export const recordSent = (leadId, { subject, templateName, sent, followUp, done
     const tpl = s.templates.find((x) => x.id === followUp.templateId);
     fus = [...fus, {
       id: 'fu-' + uid(), mode: followUp.mode, days: Number(followUp.days) || 3,
-      due: computeDue(t, followUp.days, s.settings?.followUpBusinessDays !== false),
+      due: computeDue(t, followUp.days, s.settings?.followUpBusinessDays !== false, s.settings?.followUpTz),
       templateId: tpl?.id || '', templateName: tpl?.name || '',
       from: sent.from, to: l.email, threadId: sent.threadId || '', inReplyTo: sent.rfcId || '', origSubject: subject,
       status: 'scheduled', deviceId: 'any', attempts: 0, createdAt: t, updatedAt: t,
@@ -327,9 +327,9 @@ export async function sendFollowUpNow(leadId, fuId) {
 }
 
 // ---------- Write with AI (same writer as the extension) ----------
-export async function aiWrite({ leadId, goal, from, base }) {
+export async function aiWrite({ leadId, goal, from, base, industry, audience }) {
   const l = lead(leadId);
-  return aiwrite.write({ person: l, insights: l.insights || {}, goal, base, history: l.emailsSent || [], from, settings: { gmailAccounts: [], ...settings() } });
+  return aiwrite.write({ person: l, insights: l.insights || {}, goal, base, history: l.emailsSent || [], from, industry, audience, settings: { gmailAccounts: [], ...settings() } });
 }
 
 // ---------- SalesQL ----------
@@ -472,13 +472,14 @@ export async function focusLoad({ force = false } = {}) {
 export async function quoteLoad({ force = false } = {}) {
   const s = settings();
   const prev = T.quote;
-  if (!force && prev && tdDay(prev.at) === tdDay(Date.now()) && Date.now() - prev.at < 5 * 3600e3 && (prev.by === 'claude' || !s.anthropicKey || (prev.error && Date.now() - prev.at < 20 * 60000))) return prev;
+  const sig = motivateLib.signature(leads());
+  if (!force && prev && prev.sig === sig && tdDay(prev.at) === tdDay(Date.now()) && Date.now() - prev.at < 5 * 3600e3 && (prev.by === 'claude' || !s.anthropicKey || (prev.error && Date.now() - prev.at < 20 * 60000))) return prev;
   if (quoteBusy) return prev;
   quoteBusy = true;
   try {
   const d = motivateLib.gatherFrom({ s: { gmailAccounts: [], ...s }, leads: leads(), deals: deals(), sums: S.snap?.daySummaries || {}, reports: S.snap?.dailyReports || {}, tdView: todoistViewed() });
   const r = await motivateLib.writeLine({ gmailAccounts: [], ...s }, d);
-  T.quote = { at: Date.now(), ...r };
+  T.quote = { at: Date.now(), sig, ...r };
   lsSet('pm_quote', T.quote);
   } finally { quoteBusy = false; }
   emit();
