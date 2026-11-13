@@ -1,6 +1,7 @@
 // Home screen extras: motivation line, Claude's top 3, New York ⇄ India time, and Todoist tasks.
 import * as D from './data.js';
 import { rankPending, viewOptions } from './lib/todoist.js';
+import { openMovePicker } from './lib/tdmove-ui.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 let showAll = false;
@@ -75,7 +76,7 @@ function focusHtml(v) {
   return `<div class="card fx" id="h-focus">
     <div class="fx-head"><b class="fx-big">${dueToday} due today</b>${overdue ? `<span class="pill lost">${overdue} overdue</span>` : ''}<span class="spacer"></span><button class="icon-btn" data-fx-redo aria-label="Ask Claude again">↻</button></div>
     <div class="fx-sub">${viewSelect('h-fx-view')}<span class="muted small">${f?.by === 'claude' ? '✨ Top 3 by Claude' : 'Top 3'}</span></div>
-    ${picks.length ? `<ol class="fx-list ${f && f.view !== D.todoistView() ? 'stale' : ''}">${picks.map((p) => `<li><button class="td-check p${p.task.priority}" data-td-close="${esc(p.id)}" aria-label="Mark done"></button><div><a href="${esc(p.task.url)}" target="_blank" rel="noopener">${esc(p.task.content)}</a><span class="fx-why">${esc(p.why)}</span></div></li>`).join('')}</ol>`
+    ${picks.length ? `<ol class="fx-list ${f && f.view !== D.todoistView() ? 'stale' : ''}">${picks.map((p) => `<li><button class="td-check p${p.task.priority}" data-td-close="${esc(p.id)}" aria-label="Mark done"></button><div><a href="${esc(p.task.url)}" target="_blank" rel="noopener">${esc(p.task.content)}</a><span class="fx-why">${esc(p.why)}</span></div><button class="td-move" data-td-move="${esc(p.id)}" aria-label="Move to">Move ▾</button></li>`).join('')}</ol>`
       : f ? '<div class="muted small">All caught up for today 🎉</div>' : '<div class="spinner"></div>'}
   </div>`;
 }
@@ -88,7 +89,7 @@ function todoistHtml(v) {
   return `<div class="card" id="h-todoist">
     <h3>Todoist ${viewSelect('h-td-view')}</h3>
     <div class="muted small" style="margin:-4px 0 6px">${doneToday} done today · ${v.pending.length} open${isProject ? '' : ` · <button class="link" data-td-all>${showAll ? 'Show urgent only' : 'Show all'}</button>`}</div>
-    <ul class="td-list">${list.slice(0, showAll || isProject ? 30 : 6).map((t) => `<li><button class="td-check p${t.priority}" data-td-close="${esc(t.id)}" aria-label="Mark done"></button><div class="m"><a href="${esc(t.url)}" target="_blank" rel="noopener">${esc(t.content)}</a><div class="meta">${ageOf(t)}${t.project && t.project !== 'Inbox' && !isProject ? `<span>${esc(t.project)}</span>` : ''}</div></div></li>`).join('') || `<li class="muted small">${v.pending.length ? 'Nothing overdue or due today 🎉' : 'No open tasks.'}</li>`}</ul>
+    <ul class="td-list">${list.slice(0, showAll || isProject ? 30 : 6).map((t) => `<li><button class="td-check p${t.priority}" data-td-close="${esc(t.id)}" aria-label="Mark done"></button><div class="m"><a href="${esc(t.url)}" target="_blank" rel="noopener">${esc(t.content)}</a><div class="meta">${ageOf(t)}${t.project && t.project !== 'Inbox' && !isProject ? `<span>${esc(t.project)}${t.section ? ' / ' + esc(t.section) : ''}</span>` : ''}</div></div><button class="td-move" data-td-move="${esc(t.id)}" aria-label="Move to">Move ▾</button></li>`).join('') || `<li class="muted small">${v.pending.length ? 'Nothing overdue or due today 🎉' : 'No open tasks.'}</li>`}</ul>
     <form class="td-add" data-td-add><input name="t" placeholder="Add a task…" enterkeyhint="next"><input name="w" class="when" placeholder="When?" enterkeyhint="done"><button class="btn primary sm">Add</button></form>
     ${D.T.error ? `<div class="muted small" style="color:var(--danger)">${esc(D.T.error)}</div>` : ''}
   </div>`;
@@ -112,6 +113,17 @@ export function wireExtras(v, toast) {
     D.focusLoad({ force: true }).catch(() => {});
   }));
   v.querySelector('[data-td-all]')?.addEventListener('click', () => { showAll = !showAll; D.T.cache = { ...D.T.cache }; v.querySelector('#h-todoist').outerHTML = todoistHtml(D.todoistViewed()); wireExtras(v, toast); });
+  v.querySelectorAll('[data-td-move]').forEach((b) => b.addEventListener('click', (e) => {
+    e.preventDefault();
+    const cache = D.T.cache;
+    const task = (cache?.pending || []).find((t) => t.id === b.dataset.tdMove);
+    if (!task) return;
+    openMovePicker(b, task, cache, async ({ projectId, sectionId, label }) => {
+      await D.todoistMove(task.id, { projectId, sectionId });
+      D.focusLoad({ force: true }).catch(() => {});
+      toast('Moved to ' + label);
+    }, { sheet: true, autoDark: true });
+  }));
   v.querySelectorAll('[data-td-close]').forEach((b) => b.addEventListener('click', async () => {
     b.classList.add('done'); b.disabled = true;
     try { await D.todoistClose(b.dataset.tdClose); D.focusLoad({ force: true }).catch(() => {}); toast('Done ✓'); }

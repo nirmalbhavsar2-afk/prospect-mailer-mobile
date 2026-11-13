@@ -9,7 +9,7 @@ import { periodRange, aggregate, shiftPeriod } from './lib/periods.js';
 import { fmtMin } from './lib/report.js';
 import { extrasHtml, wireExtras } from './home-extras.js';
 
-const VERSION = '1.14.1-202611121451';
+const VERSION = '1.15.0-202611130609';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -590,7 +590,7 @@ function workFor(date) {
 function aiBlock(rep, period = false) {
   if (!rep?.ai) return `<div class="muted small">No AI summary for this ${period ? 'week' : 'day'} yet.${period ? '' : ' It is written at your report time (8 PM by default).'}</div>`;
   const a = rep.ai, c = scoreColor(a.score);
-  const list = (t, items, cls = '') => (items?.length ? `<h4 class="${cls}">${esc(t)}</h4><ul>${items.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : '');
+  const list = (t, items, cls = '') => { items = crm.dropClosedMentions(items, D.leads()); return items?.length ? `<h4 class="${cls}">${esc(t)}</h4><ul>${items.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''; };
   return `<div class="ai"><div class="ai-head"><div class="score" style="color:${c};border-color:${c}">${a.score}</div><div><b>${esc(a.headline)}</b><span class="muted small">${rep.sentAt ? 'Emailed ' + esc(ago(rep.sentAt)) : ''}</span></div></div>
     <p>${esc(a.summary)}</p>
     ${period ? list('Patterns', a.patterns) + list('Wins', a.wins, 'good') + list('What to improve', a.improve, 'bad') + list('Goals', a.next_goals, 'idea')

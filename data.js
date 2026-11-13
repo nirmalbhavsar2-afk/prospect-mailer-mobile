@@ -422,7 +422,8 @@ export async function todoistLoad({ force = false } = {}) {
     const [projects, tasks] = await Promise.all([tdAll('/projects', 'results'), tdAll('/tasks', 'results')]);
     let done = [];
     try { done = await tdAll(`/tasks/completed/by_completion_date?since=${encodeURIComponent(start.toISOString())}&until=${encodeURIComponent(new Date(now + 60000).toISOString())}`, 'items'); } catch { /* optional */ }
-    T.cache = todoist.buildCache({ projects, tasks, done }, now);
+    const structure = await todoist.loadStructure((path, key) => tdAll(path, key));
+    T.cache = todoist.buildCache({ projects, tasks, done, ...structure }, now);
     T.error = '';
     lsSet('pm_todoist', T.cache);
   } catch (e) { T.error = e.message; }
@@ -432,6 +433,10 @@ export async function todoistLoad({ force = false } = {}) {
 export const todoistView = () => settings().todoistView || todoist.DEFAULT_VIEW;
 export const todoistViewed = () => (T.cache ? todoist.applyView(T.cache, todoistView()) : null);
 export async function todoistClose(id) { await tdCall(`/tasks/${encodeURIComponent(id)}/close`, { method: 'POST' }); await todoistLoad({ force: true }); }
+export async function todoistMove(id, { projectId, sectionId } = {}) {
+  await tdCall(`/tasks/${encodeURIComponent(id)}/move`, { method: 'POST', body: sectionId ? { section_id: sectionId } : { project_id: projectId } });
+  await todoistLoad({ force: true });
+}
 export async function todoistAdd(content, due, projectId) {
   const body = { content };
   if (due) body.due_string = due;
