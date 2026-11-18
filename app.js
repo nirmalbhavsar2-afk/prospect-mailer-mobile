@@ -9,7 +9,7 @@ import { periodRange, aggregate, shiftPeriod } from './lib/periods.js';
 import { fmtMin } from './lib/report.js';
 import { extrasHtml, wireExtras } from './home-extras.js';
 
-const VERSION = '1.16.1-202611180617';
+const VERSION = '1.17.3-202611181653';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
