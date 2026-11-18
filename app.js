@@ -9,7 +9,7 @@ import { periodRange, aggregate, shiftPeriod } from './lib/periods.js';
 import { fmtMin } from './lib/report.js';
 import { extrasHtml, wireExtras } from './home-extras.js';
 
-const VERSION = '1.17.3-202611181653';
+const VERSION = '1.18.0-202611181804';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -346,7 +346,7 @@ function editContact(id) {
 function compose(id, draft = null) {
   const l = D.lead(id);
   const s = D.settings();
-  const accounts = (s.gmailAccounts || []).map((a) => a.email);
+  const accounts = (s.gmailAccounts || []).filter((a) => a.provider !== 'outlook').map((a) => a.email); // Outlook accounts send from the laptop only
   if (!accounts.length) return toast('Add a Gmail account in the extension first (Settings → Gmail accounts).');
   const tpls = D.templates();
   const last = D.lastThread(l);
@@ -354,7 +354,7 @@ function compose(id, draft = null) {
   const dueReminder = fu && fu.mode === 'remind' && (fu.status === 'due' || fu.due <= Date.now());
   const sentFrom = (l.emailsSent || []).slice(-1)[0]?.from;
   const st = {
-    from: draft?.from || (sentFrom && accounts.includes(sentFrom) ? sentFrom : s.defaultSender || accounts[0]),
+    from: draft?.from || (sentFrom && accounts.includes(sentFrom) ? sentFrom : (accounts.includes(s.defaultSender) ? s.defaultSender : accounts[0])),
     to: draft?.to || l.email || '',
     templateId: draft?.templateId ?? (dueReminder ? fu.templateId : ''),
     reply: draft?.reply ?? (dueReminder && !!last),
@@ -760,7 +760,7 @@ function add(v) {
 function settingsScreen(v) {
   const s = D.settings();
   const main = auth.mainEmail();
-  const accts = (s.gmailAccounts || []).map((a) => a.email);
+  const accts = (s.gmailAccounts || []).filter((a) => a.provider !== 'outlook').map((a) => a.email);
   const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
   const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
   v.innerHTML = `
