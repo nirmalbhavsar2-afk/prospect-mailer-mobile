@@ -98,7 +98,7 @@ export function push() {
       // sign the file like the laptops do, so they can see this phone is up to date
       let pid = '';
       try { pid = localStorage.getItem('pbPhoneId') || ''; if (!pid) { pid = 'phone-' + uid(); localStorage.setItem('pbPhoneId', pid); } } catch { pid = 'phone'; }
-      merged.clients = { ...(remote?.clients || {}), [pid]: { id: pid, version: '1.19.0-202611190815'.split('-')[0], at: Date.now(), label: /iPhone|iPad/.test(navigator.userAgent) ? 'iPhone app' : 'Phone app' } };
+      merged.clients = { ...(remote?.clients || {}), [pid]: { id: pid, version: '1.22.0-202611200842'.split('-')[0], at: Date.now(), label: /iPhone|iPad/.test(navigator.userAgent) ? 'iPhone app' : 'Phone app' } };
       await drive(`${UPLOAD}/${f.id}?uploadType=media`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...merged, exportedAt: Date.now() }) });
       S.snap = merged;
       S.pending = false;
